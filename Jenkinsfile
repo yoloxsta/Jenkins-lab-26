@@ -3,31 +3,24 @@ pipeline {
 
     environment {
         compose_service_name = "react-jenkins-docker"
-        workspace = "/home/jenkins/project/react-jenkins-docker/"
     }
 
     stages {
         stage('Checkout Source') {
             steps {
-                ws("${workspace}") {
-                    checkout scm
-                }
+                checkout scm
             }
         }
 
         stage('Docker Compose Build') {
             steps {
-                ws("${workspace}") {
-                    sh "docker compose build --no-cache ${compose_service_name}"
-                }
+                sh "docker compose build --no-cache ${compose_service_name}"
             }
         }
 
         stage('Docker Compose Up') {
             steps {
-                ws("${workspace}") {
-                    sh "docker compose up --no-deps -d ${compose_service_name}"
-                }
+                sh "docker compose up --no-deps -d ${compose_service_name}"
             }
         }
     }
