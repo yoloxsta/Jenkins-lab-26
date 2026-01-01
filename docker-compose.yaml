@@ -1,0 +1,9 @@
+version: '3'
+services:
+  react-jenkins-docker:
+    container_name: react-jenkins-docker
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
