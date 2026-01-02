@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         REMOTE_USER  = "ubuntu"
-        REMOTE_HOST  = "43.204.77.55"
+        REMOTE_HOST  = "103.112.61.209"
         REMOTE_DIR   = "/home/ubuntu/react-jenkins-docker"
         SERVICE_NAME = "react-jenkins-docker"
         SSH_CRED_ID  = "uat-ssh-key"
