@@ -2,11 +2,12 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "43.204.77.55"
-        REMOTE_DIR  = "/home/ubuntu/react-jenkins-docker"
+        REMOTE_USER  = "ubuntu"
+        REMOTE_HOST  = "43.204.77.55"
+        REMOTE_DIR   = "/home/ubuntu/react-jenkins-docker"
         SERVICE_NAME = "react-jenkins-docker"
-        SSH_CRED_ID = "uat-ssh-key"
+        SSH_CRED_ID  = "uat-ssh-key"
+        GIT_BRANCH   = "main"
     }
 
     stages {
@@ -23,13 +24,16 @@ pipeline {
                     sh """
                     ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} << 'EOF'
                         set -e
+
                         mkdir -p ${REMOTE_DIR}
                         cd ${REMOTE_DIR}
 
                         if [ ! -d .git ]; then
                             git clone ${GIT_URL} .
                         else
-                            git pull origin ${BRANCH_NAME}
+                            git fetch origin
+                            git checkout ${GIT_BRANCH}
+                            git pull origin ${GIT_BRANCH}
                         fi
 
                         docker compose build --no-cache ${SERVICE_NAME}
