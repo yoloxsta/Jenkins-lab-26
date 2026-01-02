@@ -38,7 +38,7 @@ pipeline {
                         cd ${REMOTE_DIR}
 
                         # Build and run the Docker Compose service
-                        docker compose build --no-cache ${SERVICE_NAME}
+                        docker compose build ${SERVICE_NAME}
                         docker compose up --no-deps -d ${SERVICE_NAME}
                     ENDSSH
                     """
