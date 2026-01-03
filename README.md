@@ -138,3 +138,59 @@ EOF
 }
 
 ```
+
+## Nginx conf for Jenkins
+```
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name jenkinslab.sta.com;
+
+    # Redirect all HTTP requests to HTTPS
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    server_name jenkinslab.sta.com;
+
+    # SSL configuration (managed by Certbot)
+    ssl_certificate /etc/letsencrypt/live/jenkinslab.sta.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/jenkinslab.sta.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Main Jenkins location
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+
+        # Standard headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Port $server_port;
+
+        # Required for Jenkins WebSocket (Blue Ocean, pipeline logs)
+        proxy_http_version 1.1;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 86400;
+
+        # Optional: large file uploads
+        client_max_body_size 500M;
+    }
+
+    # Serve static files efficiently
+    location ~ ^/static/ {
+        proxy_pass http://127.0.0.1:8080;
+    }
+
+    # Optional: deny access to sensitive directories
+    location ~ /(WEB-INF|META-INF|\.git) {
+        deny all;
+    }
+}
+
+```
