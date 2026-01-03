@@ -7,7 +7,7 @@ pipeline {
         REMOTE_DIR   = "/home/ubuntu/react-jenkins-docker"
         SERVICE_NAME = "react-jenkins-docker"
 
-        SSH_CRED_ID  = "uat-ssh-key"        // SSH key for remote server
+        SSH_CRED_ID  = "github-repo-ssh"        // SSH key for remote server
         GIT_CRED_ID  = "github-repo-ssh"    // SSH key for GitHub
         GIT_BRANCH   = "main"
     }
