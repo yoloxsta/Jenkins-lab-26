@@ -6,7 +6,7 @@ pipeline {
         REMOTE_HOST   = "103.112.61.209"
         REMOTE_DIR    = "/home/ubuntu/react-jenkins-docker"
 
-        IMAGE_NAME    = "yoloxsta/react-jenkins-docker"
+        IMAGE_NAME    = "yolomurphy/react-jenkins-docker"
         IMAGE_TAG     = "latest"
 
         SSH_CRED_ID   = "github-repo-ssh"
