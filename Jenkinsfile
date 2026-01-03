@@ -39,7 +39,7 @@ pipeline {
 
                         # Build and run the Docker Compose service
                         docker compose build ${SERVICE_NAME}
-                        docker compose up --no-deps -d ${SERVICE_NAME}
+                        docker compose up -d ${SERVICE_NAME}
                     ENDSSH
                     """
                 }

@@ -1,33 +1,14 @@
-# Stage 1: Build the React app
+# Stage 1:
 FROM node:18-alpine AS builder
-
 WORKDIR /app
-
-# Copy package files first (for better layer caching)
-COPY package*.json ./
-
-# Install dependencies (use --ignore-scripts if you want extra security)
-RUN npm ci --only=production && npm cache clean --force
-
-# Copy source code
-COPY . .
-
-# Build the React app
+COPY package*.json ./ 
+RUN npm install
+COPY . .   
 RUN npm run build
-
-# Stage 2: Serve with Nginx
+ 
+# Stage 2:
 FROM nginx:alpine
-
-# Remove default nginx config
-RUN rm -rf /etc/nginx/conf.d/default.conf
-
-# Copy built app
 COPY --from=builder /app/build /usr/share/nginx/html
-
-# Optional: copy custom nginx config if you have one
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
-
+# COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
-
-# Run nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]
