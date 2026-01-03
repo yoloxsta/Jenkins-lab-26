@@ -2,14 +2,18 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER  = "ubuntu"
-        REMOTE_HOST  = "103.112.61.209"
-        REMOTE_DIR   = "/home/ubuntu/react-jenkins-docker"
-        SERVICE_NAME = "react-jenkins-docker"
+        REMOTE_USER   = "ubuntu"
+        REMOTE_HOST   = "103.112.61.209"
+        REMOTE_DIR    = "/home/ubuntu/react-jenkins-docker"
 
-        SSH_CRED_ID  = "github-repo-ssh"        // SSH key for remote server
-        GIT_CRED_ID  = "github-repo-ssh"    // SSH key for GitHub
-        GIT_BRANCH   = "main"
+        IMAGE_NAME    = "yoloxsta/react-jenkins-docker"
+        IMAGE_TAG     = "latest"
+
+        SSH_CRED_ID   = "github-repo-ssh"
+        GIT_CRED_ID   = "github-repo-ssh"
+        DOCKERHUB_CRED_ID = "dockerhub-creds"
+
+        GIT_BRANCH    = "main"
     }
 
     stages {
@@ -29,23 +33,49 @@ pipeline {
             }
         }
 
-        stage('Deploy to Remote Server (Docker Compose)') {
+        stage('Build Docker Image') {
+            steps {
+                sh """
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
+            }
+        }
+
+        stage('Push Image to Docker Hub') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: DOCKERHUB_CRED_ID,
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh """
+                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker logout
+                    """
+                }
+            }
+        }
+
+        stage('Deploy on Remote Server') {
             steps {
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
 set -e
 
-# Sync project to remote server
-rsync -az --delete \
+# Sync docker-compose only (no source code needed)
+rsync -az \
   -e "ssh -o StrictHostKeyChecking=no" \
-  ./ ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}
+  docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
 # SSH and deploy
 ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
 set -e
 cd ${REMOTE_DIR}
 
-docker compose build
+docker compose pull
 docker compose up -d
 EOF
 """
@@ -56,7 +86,7 @@ EOF
 
     post {
         success {
-            echo "Deployment completed successfully!"
+            echo "🚀 Deployment completed successfully!"
         }
         failure {
             echo "Pipeline failed. Check logs above."
