@@ -1,3 +1,9 @@
+def banner(msg) {
+    echo "############################################"
+    echo "### ${msg}"
+    echo "############################################"
+}
+
 pipeline {
     agent any
 
@@ -9,17 +15,21 @@ pipeline {
         IMAGE_NAME    = "yolomurphy/react-jenkins-docker"
         IMAGE_TAG     = "latest"
 
-        SSH_CRED_ID   = "github-repo-ssh"
-        GIT_CRED_ID   = "github-repo-ssh"
-        DOCKERHUB_CRED_ID = "dockerhub-creds"
+        SSH_CRED_ID        = "github-repo-ssh"
+        GIT_CRED_ID        = "github-repo-ssh"
+        DOCKERHUB_CRED_ID  = "dockerhub-creds"
 
-        GIT_BRANCH    = "main"
+        GIT_BRANCH = "main"
     }
 
     stages {
 
         stage('Checkout Source') {
             steps {
+                script {
+                    banner("Checkout stage is starting")
+                }
+
                 sshagent(credentials: [env.GIT_CRED_ID]) {
                     checkout([
                         $class: 'GitSCM',
@@ -35,14 +45,27 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                script {
+                    banner("Docker build stage is starting")
+                }
+
+                sh """
+                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                """
             }
         }
 
-        stage('Scan Docker Image (Trivy)') {
+        stage('Image Scanning (Trivy)') {
             steps {
+                script {
+                    banner("Image scanning stage is starting (Trivy)")
+                }
+
                 sh """
-                trivy image \
+                docker run --rm \
+                  -v /var/run/docker.sock:/var/run/docker.sock \
+                  aquasec/trivy:latest \
+                  image \
                   --severity HIGH,CRITICAL \
                   --exit-code 1 \
                   ${IMAGE_NAME}:${IMAGE_TAG}
@@ -52,6 +75,10 @@ pipeline {
 
         stage('Push Image to Docker Hub') {
             steps {
+                script {
+                    banner("Docker push stage is starting")
+                }
+
                 withCredentials([
                     usernamePassword(
                         credentialsId: DOCKERHUB_CRED_ID,
@@ -70,15 +97,24 @@ pipeline {
 
         stage('Deploy on Remote Server') {
             steps {
+                script {
+                    banner("Remote deployment stage is starting")
+                }
+
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
 set -e
-rsync -az -e "ssh -o StrictHostKeyChecking=no" docker-compose.yaml \
-  ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
+# Copy docker-compose only
+rsync -az \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+
+# SSH and deploy
 ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
 set -e
 cd ${REMOTE_DIR}
+
 docker compose pull
 docker compose up -d
 EOF
@@ -90,10 +126,10 @@ EOF
 
     post {
         success {
-            echo "🚀 Deployment completed successfully!"
+            banner("PIPELINE COMPLETED SUCCESSFULLY 🚀")
         }
         failure {
-            echo "❌ Pipeline failed due to security or deployment issue."
+            banner("PIPELINE FAILED — CHECK LOGS")
         }
     }
 }
