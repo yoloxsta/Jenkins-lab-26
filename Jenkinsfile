@@ -35,8 +35,17 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+            }
+        }
+
+        stage('Scan Docker Image (Trivy)') {
+            steps {
                 sh """
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
+                trivy image \
+                  --severity HIGH,CRITICAL \
+                  --exit-code 1 \
+                  ${IMAGE_NAME}:${IMAGE_TAG}
                 """
             }
         }
@@ -64,17 +73,12 @@ pipeline {
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
 set -e
+rsync -az -e "ssh -o StrictHostKeyChecking=no" docker-compose.yaml \
+  ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
-# Sync docker-compose only (no source code needed)
-rsync -az \
-  -e "ssh -o StrictHostKeyChecking=no" \
-  docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
-
-# SSH and deploy
 ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
 set -e
 cd ${REMOTE_DIR}
-
 docker compose pull
 docker compose up -d
 EOF
@@ -89,7 +93,7 @@ EOF
             echo "🚀 Deployment completed successfully!"
         }
         failure {
-            echo "Pipeline failed. Check logs above."
+            echo "❌ Pipeline failed due to security or deployment issue."
         }
     }
 }
