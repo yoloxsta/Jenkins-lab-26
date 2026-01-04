@@ -8,26 +8,27 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER   = "ubuntu"
-        REMOTE_HOST   = "103.112.61.209"
-        REMOTE_DIR    = "/home/ubuntu/react-jenkins-docker"
+        REMOTE_USER  = "ubuntu"
+        REMOTE_HOST  = "103.112.61.209"
+        REMOTE_DIR   = "/home/ubuntu/react-jenkins-docker"
 
-        IMAGE_NAME    = "yolomurphy/react-jenkins-docker"
-        IMAGE_TAG     = "latest"
+        IMAGE_NAME   = "yolomurphy/react-jenkins-docker"
+        IMAGE_TAG    = "latest"
 
-        SSH_CRED_ID        = "github-repo-ssh"
-        GIT_CRED_ID        = "github-repo-ssh"
-        DOCKERHUB_CRED_ID  = "dockerhub-creds"
+        SSH_CRED_ID       = "github-repo-ssh"
+        GIT_CRED_ID       = "github-repo-ssh"
+        DOCKERHUB_CRED_ID = "dockerhub-creds"
 
         GIT_BRANCH = "main"
     }
 
     stages {
 
+        /* ===================== CHECKOUT ===================== */
         stage('Checkout Source') {
             steps {
                 script {
-                    banner("Checkout stage is starting")
+                    banner("CHECKOUT STAGE IS STARTING")
                 }
 
                 sshagent(credentials: [env.GIT_CRED_ID]) {
@@ -43,10 +44,25 @@ pipeline {
             }
         }
 
+        /* ===================== UNIT TEST ===================== */
+        stage('Unit Tests') {
+            steps {
+                script {
+                    banner("UNIT TEST STAGE IS STARTING")
+                }
+
+                sh """
+                npm install
+                npm test -- --watchAll=false
+                """
+            }
+        }
+
+        /* ===================== BUILD ===================== */
         stage('Build Docker Image') {
             steps {
                 script {
-                    banner("Docker build stage is starting")
+                    banner("DOCKER BUILD STAGE IS STARTING")
                 }
 
                 sh """
@@ -55,10 +71,11 @@ pipeline {
             }
         }
 
-        stage('Image Scanning (Trivy)') {
+        /* ===================== SECURITY SCAN ===================== */
+        stage('Image Scan (Trivy)') {
             steps {
                 script {
-                    banner("Image scanning stage is starting (Trivy)")
+                    banner("IMAGE SCANNING STAGE IS STARTING (TRIVY)")
                 }
 
                 sh """
@@ -73,10 +90,11 @@ pipeline {
             }
         }
 
+        /* ===================== PUSH ===================== */
         stage('Push Image to Docker Hub') {
             steps {
                 script {
-                    banner("Docker push stage is starting")
+                    banner("DOCKER PUSH STAGE IS STARTING")
                 }
 
                 withCredentials([
@@ -95,10 +113,11 @@ pipeline {
             }
         }
 
-        stage('Deploy on Remote Server') {
+        /* ===================== DEPLOY ===================== */
+        stage('Deploy to Remote Server') {
             steps {
                 script {
-                    banner("Remote deployment stage is starting")
+                    banner("DEPLOYMENT STAGE IS STARTING")
                 }
 
                 sshagent(credentials: [env.SSH_CRED_ID]) {
@@ -120,6 +139,20 @@ docker compose up -d
 EOF
 """
                 }
+            }
+        }
+
+        /* ===================== HEALTH CHECK ===================== */
+        stage('Post-Deploy Health Check') {
+            steps {
+                script {
+                    banner("POST-DEPLOY HEALTH CHECK STAGE IS STARTING")
+                }
+
+                sh """
+                sleep 10
+                curl -f http://${REMOTE_HOST}:8091
+                """
             }
         }
     }
