@@ -43,30 +43,34 @@ pipeline {
             }
         }
 
-        stage('Code Scan (Semgrep - HTML Report)') {
+        stage('Code Scan (Semgrep - Non Blocking)') {
             steps {
                 script {
-                    banner("Code scanning stage is starting (Semgrep HTML Report)")
+                    banner("Code scanning stage is starting (Semgrep)")
                 }
 
-                // Create reports directory
-                sh "mkdir -p reports"
-
-                // Run Semgrep and generate HTML report (non-blocking)
                 sh '''
+                mkdir -p reports
                 docker run --rm \
-                  -v "$PWD:/src" \
-                  returntocorp/semgrep \
-                  semgrep scan \
-                  --config=p/ci \
-                  --exclude=Dockerfile \
-                  --exclude=docker-compose.yaml \
-                  --metrics=off \
-                  --output /src/reports/semgrep-report.html \
-                  || true
+                -v "$PWD:/src" \
+                returntocorp/semgrep \
+                semgrep scan \
+                --config=p/ci \
+                --exclude=Dockerfile \
+                --exclude=docker-compose.yaml \
+                --output /src/reports/semgrep-report.html \
+                --json || true
                 '''
             }
+
+            // Archive the report so you can view in Jenkins
+            post {
+                always {
+                    archiveArtifacts artifacts: 'reports/semgrep-report.html', allowEmptyArchive: true
+                }
+            }
         }
+
 
         stage('Build Docker Image') {
             steps {
