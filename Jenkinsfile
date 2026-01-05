@@ -8,27 +8,25 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER   = "ubuntu"
-        REMOTE_HOST   = "103.112.61.209"
-        REMOTE_DIR    = "/home/ubuntu/react-jenkins-docker"
+        REMOTE_USER        = "ubuntu"
+        REMOTE_HOST        = "103.112.61.209"
+        REMOTE_DIR         = "/home/ubuntu/react-jenkins-docker"
 
-        IMAGE_NAME    = "yolomurphy/react-jenkins-docker"
-        IMAGE_TAG     = "latest"
+        IMAGE_NAME         = "yolomurphy/react-jenkins-docker"
+        IMAGE_TAG          = "latest"
 
         SSH_CRED_ID        = "github-repo-ssh"
         GIT_CRED_ID        = "github-repo-ssh"
         DOCKERHUB_CRED_ID  = "dockerhub-creds"
 
-        GIT_BRANCH = "main"
+        GIT_BRANCH         = "main"
     }
 
     stages {
 
         stage('Checkout Source') {
             steps {
-                script {
-                    banner("Checkout stage is starting")
-                }
+                script { banner("Checkout stage is starting") }
 
                 sshagent(credentials: [env.GIT_CRED_ID]) {
                     checkout([
@@ -45,9 +43,7 @@ pipeline {
 
         stage('Code Scan (Semgrep - Non Blocking)') {
             steps {
-                script {
-                    banner("Code scanning stage is starting (Semgrep)")
-                }
+                script { banner("Code scanning stage is starting (Semgrep)") }
 
                 sh '''
                 mkdir -p reports
@@ -62,20 +58,25 @@ pipeline {
                 '''
             }
 
-            // Archive the report so you can view in Jenkins
             post {
                 always {
+                    // Archive and publish HTML report
                     archiveArtifacts artifacts: 'reports/semgrep-report.html', allowEmptyArchive: true
+                    publishHTML([
+                        reportDir: 'reports',
+                        reportFiles: 'semgrep-report.html',
+                        reportName: 'Semgrep Security Report',
+                        keepAll: true,
+                        alwaysLinkToLastBuild: true,
+                        allowMissing: true
+                    ])
                 }
             }
         }
 
-
         stage('Build Docker Image') {
             steps {
-                script {
-                    banner("Docker build stage is starting")
-                }
+                script { banner("Docker build stage is starting") }
 
                 sh """
                 docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
@@ -85,9 +86,7 @@ pipeline {
 
         stage('Image Scanning (Trivy)') {
             steps {
-                script {
-                    banner("Image scanning stage is starting (Trivy)")
-                }
+                script { banner("Image scanning stage is starting (Trivy)") }
 
                 sh """
                 docker run --rm \
@@ -103,9 +102,7 @@ pipeline {
 
         stage('Push Image to Docker Hub') {
             steps {
-                script {
-                    banner("Docker push stage is starting")
-                }
+                script { banner("Docker push stage is starting") }
 
                 withCredentials([
                     usernamePassword(
@@ -125,17 +122,12 @@ pipeline {
 
         stage('Deploy on Remote Server') {
             steps {
-                script {
-                    banner("Remote deployment stage is starting")
-                }
+                script { banner("Remote deployment stage is starting") }
 
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
 set -e
-
-rsync -az \
-  -e "ssh -o StrictHostKeyChecking=no" \
-  docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+rsync -az -e "ssh -o StrictHostKeyChecking=no" docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
 ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
 set -e
@@ -151,16 +143,11 @@ EOF
 
     post {
         always {
-            // Archive the Semgrep HTML report so it is accessible from Jenkins UI
+            // Keep the HTML report for all builds
             archiveArtifacts artifacts: 'reports/semgrep-report.html', fingerprint: true
         }
 
-        success {
-            banner("PIPELINE COMPLETED SUCCESSFULLY 🚀")
-        }
-
-        failure {
-            banner("PIPELINE FAILED — CHECK LOGS")
-        }
+        success { banner("PIPELINE COMPLETED SUCCESSFULLY 🚀") }
+        failure { banner("PIPELINE FAILED — CHECK LOGS") }
     }
 }
