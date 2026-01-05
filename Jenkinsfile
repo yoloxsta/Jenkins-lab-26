@@ -52,14 +52,13 @@ pipeline {
                 sh '''
                 mkdir -p reports
                 docker run --rm \
-                -v "$PWD:/src" \
-                returntocorp/semgrep \
-                semgrep scan \
-                --config=p/ci \
-                --exclude=Dockerfile \
-                --exclude=docker-compose.yaml \
-                --output /src/reports/semgrep-report.html \
-                --json || true
+                  -v "$PWD:/src" \
+                  returntocorp/semgrep \
+                  semgrep scan \
+                  --config=p/ci \
+                  --exclude=Dockerfile \
+                  --exclude=docker-compose.yaml \
+                  --html /src/reports/semgrep-report.html || true
                 '''
             }
 
