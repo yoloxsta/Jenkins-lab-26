@@ -43,6 +43,26 @@ pipeline {
             }
         }
 
+        stage('Code Scan (Semgrep - Non Blocking)') {
+            steps {
+                script {
+                    banner("Code scanning stage is starting (Semgrep)")
+                }
+
+                sh '''
+                docker run --rm \
+                  -v "$PWD:/src" \
+                  returntocorp/semgrep \
+                  semgrep scan \
+                  --config=auto \
+                  --exclude=Dockerfile \
+                  --exclude=docker-compose.yaml \
+                  --metrics=off \
+                  || true
+                '''
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -105,16 +125,13 @@ pipeline {
                     sh """
 set -e
 
-# Copy docker-compose only
 rsync -az \
   -e "ssh -o StrictHostKeyChecking=no" \
   docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
-# SSH and deploy
 ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
 set -e
 cd ${REMOTE_DIR}
-
 docker compose pull
 docker compose up -d
 EOF
