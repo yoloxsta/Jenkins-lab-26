@@ -51,17 +51,18 @@ pipeline {
 
                 sh '''
                 docker run --rm \
-                  -v "$PWD:/src" \
-                  returntocorp/semgrep \
-                  semgrep scan \
-                  --config=auto \
-                  --exclude=Dockerfile \
-                  --exclude=docker-compose.yaml \
-                  --metrics=off \
-                  || true
+                -v "$PWD:/src" \
+                returntocorp/semgrep \
+                semgrep scan \
+                --config=p/ci \
+                --exclude=Dockerfile \
+                --exclude=docker-compose.yaml \
+                --metrics=off \
+                || true
                 '''
             }
         }
+
 
         stage('Build Docker Image') {
             steps {
