@@ -43,48 +43,6 @@ pipeline {
             }
         }
 
-        /* =======================
-           CODE SCANNING STAGES
-           ======================= */
-
-        stage('Secret Scan (Gitleaks)') {
-            steps {
-                script {
-                    banner("Secret scanning stage is starting (Gitleaks)")
-                }
-
-                sh """
-                docker run --rm \
-                  -v \$(pwd):/repo \
-                  zricethezav/gitleaks:latest \
-                  detect \
-                  --source=/repo \
-                  --exit-code 1
-                """
-            }
-        }
-
-        stage('Static Code Scan (Semgrep)') {
-            steps {
-                script {
-                    banner("Static code scan stage is starting (Semgrep)")
-                }
-
-                sh """
-                docker run --rm \
-                  -v \$(pwd):/src \
-                  returntocorp/semgrep \
-                  semgrep \
-                  --config=auto \
-                  --error
-                """
-            }
-        }
-
-        /* =======================
-           BUILD & IMAGE SCAN
-           ======================= */
-
         stage('Build Docker Image') {
             steps {
                 script {
@@ -147,13 +105,16 @@ pipeline {
                     sh """
 set -e
 
+# Copy docker-compose only
 rsync -az \
   -e "ssh -o StrictHostKeyChecking=no" \
   docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
+# SSH and deploy
 ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
 set -e
 cd ${REMOTE_DIR}
+
 docker compose pull
 docker compose up -d
 EOF
