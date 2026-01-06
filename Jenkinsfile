@@ -129,23 +129,23 @@ pipeline {
         /* ================= DEPLOY ================= */
         stage('Deploy on Remote Server') {
             steps {
-                script { banner("Remote deployment stage is starting") }
+                script {
+                    banner("Remote deployment stage is starting")
+                }
 
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
                     rsync -az \
-                      -e "ssh -o StrictHostKeyChecking=no" \
-                      docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+                    -e "ssh -o StrictHostKeyChecking=no" \
+                    docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
-                    ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
-                    cd ${REMOTE_DIR}
-                    docker compose pull
-                    docker compose up -d
-                    EOF
+                    ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} \
+                    "cd ${REMOTE_DIR} && docker compose pull && docker compose up -d"
                     """
                 }
             }
         }
+
     }
 
     post {
