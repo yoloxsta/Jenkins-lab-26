@@ -24,7 +24,6 @@ pipeline {
 
     stages {
 
-        /* ================= CHECKOUT ================= */
         stage('Checkout Source') {
             steps {
                 script { banner("Checkout stage is starting") }
@@ -42,7 +41,6 @@ pipeline {
             }
         }
 
-        /* ================= SEMGREP ================= */
         stage('Code Scan (Semgrep – Non Blocking)') {
             steps {
                 script { banner("Code scanning stage is starting (Semgrep)") }
@@ -77,18 +75,14 @@ pipeline {
             }
         }
 
-        /* ================= BUILD ================= */
         stage('Build Docker Image') {
             steps {
                 script { banner("Docker build stage is starting") }
 
-                sh """
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                """
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
-        /* ================= TRIVY ================= */
         stage('Image Scan (Trivy)') {
             steps {
                 script { banner("Image scanning stage is starting (Trivy)") }
@@ -105,7 +99,6 @@ pipeline {
             }
         }
 
-        /* ================= PUSH ================= */
         stage('Push Image to Docker Hub') {
             steps {
                 script { banner("Docker push stage is starting") }
@@ -126,34 +119,38 @@ pipeline {
             }
         }
 
-        /* ================= DEPLOY ================= */
+        /* 🔐 MANUAL APPROVAL */
+        stage('Manual Approval') {
+            steps {
+                script { banner("WAITING FOR MANUAL APPROVAL") }
+
+                input(
+                    message: 'Approve deployment to server?',
+                    ok: 'Deploy Now'
+                )
+            }
+        }
+
         stage('Deploy on Remote Server') {
             steps {
-                script {
-                    banner("Remote deployment stage is starting")
-                }
+                script { banner("Remote deployment stage is starting") }
 
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
                     rsync -az \
-                    -e "ssh -o StrictHostKeyChecking=no" \
-                    docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+                      -e "ssh -o StrictHostKeyChecking=no" \
+                      docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
                     ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} \
-                    "cd ${REMOTE_DIR} && docker compose pull && docker compose up -d"
+                      "cd ${REMOTE_DIR} && docker compose pull && docker compose up -d"
                     """
                 }
             }
         }
-
     }
 
     post {
-        success {
-            banner("PIPELINE COMPLETED SUCCESSFULLY 🚀")
-        }
-        failure {
-            banner("PIPELINE FAILED — CHECK LOGS ❌")
-        }
+        success { banner("PIPELINE COMPLETED SUCCESSFULLY 🚀") }
+        failure { banner("PIPELINE FAILED — CHECK LOGS ❌") }
     }
 }
