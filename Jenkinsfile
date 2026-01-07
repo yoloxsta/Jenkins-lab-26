@@ -53,7 +53,7 @@ pipeline {
                         returnStdout: true
                     ).trim()
 
-                    env.IMAGE_TAG = "${gitCommit}-${env.BUILD_NUMBER}"
+                    env.IMAGE_TAG = "${gitCommit}"
                     echo "Using IMAGE_TAG = ${env.IMAGE_TAG}"
                 }
             }
