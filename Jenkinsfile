@@ -8,22 +8,30 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER   = "ubuntu"
-        REMOTE_HOST   = "103.112.61.209"
-        REMOTE_DIR    = "/home/ubuntu/react-jenkins-docker"
+        /* ===== REMOTE DEPLOY ===== */
+        REMOTE_USER = "ubuntu"
+        REMOTE_HOST = "103.112.61.209"
+        REMOTE_DIR  = "/home/ubuntu/react-jenkins-docker"
 
-        IMAGE_NAME    = "yolomurphy/react-jenkins-docker"
-        IMAGE_TAG     = "latest"
+        /* ===== IMAGE ===== */
+        IMAGE_NAME = "yolomurphy/react-jenkins-docker"
+        IMAGE_TAG  = "latest"
 
-        SSH_CRED_ID        = "github-repo-ssh"
-        GIT_CRED_ID        = "github-repo-ssh"
-        DOCKERHUB_CRED_ID  = "dockerhub-creds"
+        /* ===== CREDENTIALS ===== */
+        SSH_CRED_ID       = "github-repo-ssh"
+        GIT_CRED_ID       = "github-repo-ssh"
+        DOCKERHUB_CRED_ID = "dockerhub-creds"
 
         GIT_BRANCH = "main"
+
+        /* ===== 🔧 DOCKER TIMEOUT FIX ===== */
+        DOCKER_CLIENT_TIMEOUT = "300"
+        COMPOSE_HTTP_TIMEOUT  = "300"
     }
 
     stages {
 
+        /* ================= CHECKOUT ================= */
         stage('Checkout Source') {
             steps {
                 script { banner("Checkout stage is starting") }
@@ -41,6 +49,7 @@ pipeline {
             }
         }
 
+        /* ================= SEMGREP ================= */
         stage('Code Scan (Semgrep – Non Blocking)') {
             steps {
                 script { banner("Code scanning stage is starting (Semgrep)") }
@@ -75,14 +84,15 @@ pipeline {
             }
         }
 
+        /* ================= BUILD ================= */
         stage('Build Docker Image') {
             steps {
                 script { banner("Docker build stage is starting") }
-
                 sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
+        /* ================= TRIVY ================= */
         stage('Image Scan (Trivy)') {
             steps {
                 script { banner("Image scanning stage is starting (Trivy)") }
@@ -99,6 +109,7 @@ pipeline {
             }
         }
 
+        /* ================= PUSH ================= */
         stage('Push Image to Docker Hub') {
             steps {
                 script { banner("Docker push stage is starting") }
@@ -111,7 +122,11 @@ pipeline {
                     )
                 ]) {
                     sh """
-                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+                    echo \$DOCKER_PASS | docker login \
+                      --username \$DOCKER_USER \
+                      --password-stdin \
+                      https://index.docker.io/v1/
+
                     docker push ${IMAGE_NAME}:${IMAGE_TAG}
                     docker logout
                     """
@@ -119,18 +134,15 @@ pipeline {
             }
         }
 
-        /* 🔐 MANUAL APPROVAL */
+        /* ================= 🔐 MANUAL APPROVAL ================= */
         stage('Manual Approval') {
             steps {
                 script { banner("WAITING FOR MANUAL APPROVAL") }
-
-                input(
-                    message: 'Approve deployment to server?',
-                    ok: 'Deploy Now'
-                )
+                input message: 'Approve deployment to server?', ok: 'Deploy Now'
             }
         }
 
+        /* ================= DEPLOY ================= */
         stage('Deploy on Remote Server') {
             steps {
                 script { banner("Remote deployment stage is starting") }
@@ -139,9 +151,11 @@ pipeline {
                     sh """
                     rsync -az \
                       -e "ssh -o StrictHostKeyChecking=no" \
-                      docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
+                      docker-compose.yaml \
+                      ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
-                    ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} \
+                    ssh -o StrictHostKeyChecking=no \
+                      ${REMOTE_USER}@${REMOTE_HOST} \
                       "cd ${REMOTE_DIR} && docker compose pull && docker compose up -d"
                     """
                 }
