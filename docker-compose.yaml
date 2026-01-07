@@ -1,6 +1,6 @@
 services:
   react-jenkins-docker:
-    image: yolomurphy/react-jenkins-docker:latest
+    image: yolomurphy/react-jenkins-docker:${IMAGE_TAG}
     container_name: react-jenkins-docker
     ports:
       - "8091:80"

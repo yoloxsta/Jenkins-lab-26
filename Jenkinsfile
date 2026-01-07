@@ -15,7 +15,6 @@ pipeline {
 
         /* ===== IMAGE ===== */
         IMAGE_NAME = "yolomurphy/react-jenkins-docker"
-        IMAGE_TAG  = "latest"
 
         /* ===== CREDENTIALS ===== */
         SSH_CRED_ID       = "github-repo-ssh"
@@ -34,17 +33,28 @@ pipeline {
         /* ================= CHECKOUT ================= */
         stage('Checkout Source') {
             steps {
-                script { banner("Checkout stage is starting") }
+                script {
+                    banner("Checkout stage is starting")
 
-                sshagent(credentials: [env.GIT_CRED_ID]) {
-                    checkout([
-                        $class: 'GitSCM',
-                        branches: [[name: "*/${GIT_BRANCH}"]],
-                        userRemoteConfigs: [[
-                            url: 'git@github.com:yoloxsta/Jenkins-lab-26.git',
-                            credentialsId: env.GIT_CRED_ID
-                        ]]
-                    ])
+                    sshagent(credentials: [env.GIT_CRED_ID]) {
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${GIT_BRANCH}"]],
+                            userRemoteConfigs: [[
+                                url: 'git@github.com:yoloxsta/Jenkins-lab-26.git',
+                                credentialsId: env.GIT_CRED_ID
+                            ]]
+                        ])
+                    }
+
+                    /* 🔖 IMAGE TAG = git-sha + build number */
+                    def gitCommit = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+
+                    env.IMAGE_TAG = "${gitCommit}-${env.BUILD_NUMBER}"
+                    echo "Using IMAGE_TAG = ${env.IMAGE_TAG}"
                 }
             }
         }
@@ -138,7 +148,7 @@ pipeline {
         stage('Manual Approval') {
             steps {
                 script { banner("WAITING FOR MANUAL APPROVAL") }
-                input message: 'Approve deployment to server?', ok: 'Deploy Now'
+                input message: "Deploy image tag ${IMAGE_TAG} ?", ok: "Deploy Now"
             }
         }
 
@@ -156,7 +166,11 @@ pipeline {
 
                     ssh -o StrictHostKeyChecking=no \
                       ${REMOTE_USER}@${REMOTE_HOST} \
-                      "cd ${REMOTE_DIR} && docker compose pull && docker compose up -d"
+                      "
+                      cd ${REMOTE_DIR} &&
+                      IMAGE_TAG=${IMAGE_TAG} docker compose pull &&
+                      IMAGE_TAG=${IMAGE_TAG} docker compose up -d
+                      "
                     """
                 }
             }
