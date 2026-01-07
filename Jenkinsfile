@@ -8,16 +8,16 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER = "ubuntu"
-        REMOTE_HOST = "103.112.61.209"
-        REMOTE_DIR  = "/home/ubuntu/react-jenkins-docker"
+        REMOTE_USER   = "ubuntu"
+        REMOTE_HOST   = "103.112.61.209"
+        REMOTE_DIR    = "/home/ubuntu/react-jenkins-docker"
 
-        IMAGE_NAME = "yolomurphy/react-jenkins-docker"
-        IMAGE_TAG  = "${env.GIT_COMMIT.take(7)}"
+        IMAGE_NAME    = "yolomurphy/react-jenkins-docker"
+        IMAGE_TAG     = "latest"
 
-        SSH_CRED_ID       = "github-repo-ssh"
-        GIT_CRED_ID       = "github-repo-ssh"
-        DOCKERHUB_CRED_ID = "dockerhub-creds"
+        SSH_CRED_ID        = "github-repo-ssh"
+        GIT_CRED_ID        = "github-repo-ssh"
+        DOCKERHUB_CRED_ID  = "dockerhub-creds"
 
         GIT_BRANCH = "main"
     }
@@ -47,6 +47,7 @@ pipeline {
 
                 sh '''
                 mkdir -p reports
+
                 docker run --rm \
                   -v "$PWD:/src" \
                   returntocorp/semgrep \
@@ -62,7 +63,14 @@ pipeline {
 
             post {
                 always {
-                    archiveArtifacts artifacts: 'reports/semgrep-report.json'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'reports',
+                        reportFiles: 'semgrep-report.json',
+                        reportName: 'Semgrep Security Report'
+                    ])
                 }
             }
         }
@@ -71,9 +79,7 @@ pipeline {
             steps {
                 script { banner("Docker build stage is starting") }
 
-                sh """
-                docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
-                """
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
             }
         }
 
@@ -113,20 +119,21 @@ pipeline {
             }
         }
 
+        /* 🔐 MANUAL APPROVAL */
         stage('Manual Approval') {
             steps {
                 script { banner("WAITING FOR MANUAL APPROVAL") }
 
                 input(
-                    message: "Deploy image ${IMAGE_NAME}:${IMAGE_TAG} ?",
-                    ok: "Deploy Now"
+                    message: 'Approve deployment to server?',
+                    ok: 'Deploy Now'
                 )
             }
         }
 
         stage('Deploy on Remote Server') {
             steps {
-                script { banner("Deploying image ${IMAGE_NAME}:${IMAGE_TAG}") }
+                script { banner("Remote deployment stage is starting") }
 
                 sshagent(credentials: [env.SSH_CRED_ID]) {
                     sh """
@@ -134,12 +141,8 @@ pipeline {
                       -e "ssh -o StrictHostKeyChecking=no" \
                       docker-compose.yaml ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_DIR}/
 
-                    ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} <<EOF
-                    cd ${REMOTE_DIR}
-                    export IMAGE_TAG=${IMAGE_TAG}
-                    docker compose pull
-                    docker compose up -d
-EOF
+                    ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} \
+                      "cd ${REMOTE_DIR} && docker compose pull && docker compose up -d"
                     """
                 }
             }
@@ -148,6 +151,6 @@ EOF
 
     post {
         success { banner("PIPELINE COMPLETED SUCCESSFULLY 🚀") }
-        failure { banner("PIPELINE FAILED — CHECK LOGS") }
+        failure { banner("PIPELINE FAILED — CHECK LOGS ❌") }
     }
 }
