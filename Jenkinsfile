@@ -24,8 +24,8 @@ pipeline {
         GIT_BRANCH = "main"
 
         /* ===== 🔧 DOCKER TIMEOUT FIX ===== */
-        DOCKER_CLIENT_TIMEOUT = "300"
-        COMPOSE_HTTP_TIMEOUT  = "300"
+        DOCKER_CLIENT_TIMEOUT = "600"
+        COMPOSE_HTTP_TIMEOUT  = "600"
     }
 
     stages {
