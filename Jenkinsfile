@@ -49,7 +49,7 @@ pipeline {
 
                     /* 🔖 IMAGE TAG = git-sha + build number */
                     def gitCommit = sh(
-                        script: "git rev-parse --short HEAD",
+                        script: "git rev-parse --short=5 HEAD",
                         returnStdout: true
                     ).trim()
 
